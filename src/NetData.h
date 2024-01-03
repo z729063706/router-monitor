@@ -5,8 +5,9 @@
 #include <ArduinoJson.h>
 #include <string>
 
-WiFiManagerParameter netdata_host("host", "NetData Host", "192.168.8.1", 40);
-WiFiManagerParameter netdata_port("port", "NetData Port", "19999", 6);
+const char* NETDATA_HOST = "192.168.1.27";     
+const char* NETDATA_PORT = "19999";     
+
 
 class NetDataResponse
 {
@@ -87,9 +88,6 @@ bool getNetDataInfoWithDimension(String chartID, NetDataResponse &data, String d
 {
     WiFiClient client;
 
-    const char* NETDATA_HOST = netdata_host.getValue();
-    const char* NETDATA_PORT = netdata_port.getValue();
-
     String path = "/api/v1/data";
     path = path + "?chart=" + chartID;
     path = path + "&format=json";
@@ -111,17 +109,17 @@ bool getNetDataInfoWithDimension(String chartID, NetDataResponse &data, String d
     {
         // 向服务器发送http请求信息
         client.print(httpRequest);
-        Serial.println("Sending request: ");
-        Serial.println(httpRequest);
+        // Serial.println("Sending request: ");
+        // Serial.println(httpRequest);
 
         // 获取并显示服务器响应状态行
         String response_status = client.readStringUntil('\n');
-        Serial.print("response_status: ");
-        Serial.println(response_status);
+        // Serial.print("response_status: ");
+        // Serial.println(response_status);
         // 使用find跳过HTTP响应头
         if (client.find("\r\n\r\n"))
         {
-            Serial.println("Found Header End. Start Parsing.");
+            //Serial.println("Found Header End. Start Parsing.");
         }
 
         // 利用ArduinoJson库解析NetData返回的信息

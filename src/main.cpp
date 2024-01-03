@@ -1,7 +1,5 @@
 #include <string>
 #include <ESP8266WiFi.h>
-#include <WiFiManager.h>
-
 #include <lvgl.h>
 #include <TFT_eSPI.h>
 
@@ -9,7 +7,9 @@
 
 using namespace std;
 
-const char *AP_NAME = "Router Monitor";
+const char* ssid = "Redmi_C989";
+const char* password = "13945655410"; 
+const int DEBUG = 0;
 
 LV_FONT_DECLARE(tencent_w7_22)
 LV_FONT_DECLARE(tencent_w7_24)
@@ -62,7 +62,7 @@ double cpu_usage;
 double mem_usage;
 double temp_value;
 
-WiFiManager wm;
+//WiFiManager wm;
 static NetDataResponse netdata;
 
 // 屏幕亮度设置，value [0, 256] 越小越亮, 越大越暗
@@ -83,8 +83,6 @@ void getCPUUsage()
         double nice = netdata.latest_values[3].as<double>();
 
         cpu_usage = softirq + user + system + nice;
-        Serial.print("CPU Usage: ");
-        Serial.println(cpu_usage);
         lv_obj_set_hidden(loading_page, true);
         lv_obj_set_hidden(monitor_page, false);
     }
@@ -105,19 +103,14 @@ void getMemoryUsage()
 
         // 计算已使用RAM的百分比
         mem_usage = (usedRam / totalRam) * 100;
-
-        Serial.print("Memory Available: ");
-        Serial.println(mem_usage);
     }
 }
 
 void getTemperature()
 {
-    if (getNetDataInfo("sensors.temp_thermal_zone0_thermal_thermal_zone0", netdata))
+    if (getNetDataInfo("sensors.coretemp-isa-0000_temperature", netdata))
     {
         temp_value = netdata.latest_values[0].as<double>();
-        Serial.print("Temperature: ");
-        Serial.println(temp_value);
     }
 }
 void setSpeedLabel(double speed, lv_obj_t *speed_label, lv_obj_t *unit_label)
@@ -189,11 +182,9 @@ lv_coord_t updateNetSeries(lv_coord_t *series, double speed)
 
 void getNetworkReceived()
 {
-    if (getNetDataInfoWithDimension("net.pppoe_wan", netdata, "received"))
+    if (getNetDataInfoWithDimension("net.enp1s0", netdata, "received"))
     {
         double receivedBits = netdata.latest_values[0].as<double>();
-        Serial.print("Received: ");
-        Serial.println(receivedBits);
 
         down_speed = receivedBits / 8.0; // byte = 8 bit
         down_speed_max = updateNetSeries(down_serise, down_speed);
@@ -203,11 +194,9 @@ void getNetworkReceived()
 
 void getNetworkSent()
 {
-    if (getNetDataInfoWithDimension("net.pppoe_wan", netdata, "sent"))
+    if (getNetDataInfoWithDimension("net.enp1s0", netdata, "sent"))
     {
         double sentBits = netdata.latest_values[0].as<double>();
-        Serial.print("Sent: ");
-        Serial.println(sentBits);
 
         up_speed = -1 * sentBits / 8.0;
         up_speed_max = updateNetSeries(up_serise, up_speed);
@@ -268,17 +257,22 @@ void saveConfigCallback()
 }
 
 void setup()
-{
+{   
     Serial.begin(9600);
     setBrightness(180);
 
     // wm.resetSettings();
-    wm.addParameter(&netdata_host);
-    wm.addParameter(&netdata_port);
-    wm.setSaveConfigCallback(saveConfigCallback);
-    wm.setConfigPortalBlocking(false);
-    bool state = wm.autoConnect(AP_NAME);
-
+    // wm.addParameter(&netdata_host);
+    // wm.addParameter(&netdata_port);
+    // wm.setSaveConfigCallback(saveConfigCallback);
+    // wm.setConfigPortalBlocking(false);
+    // bool state = wm.autoConnect(AP_NAME);
+    WiFi.begin(ssid, password);
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(500);
+        Serial.print(".");
+    }
+    Serial.println(WiFi.localIP());
     tft.begin();
     tft.setRotation(0);
 
@@ -504,19 +498,10 @@ void setup()
     lv_obj_set_style_local_text_color(temp_value_label, LV_OBJ_PART_MAIN, LV_STATE_DEFAULT, LV_COLOR_WHITE);
 
     lv_task_create(update, 1000, LV_TASK_PRIO_MID, 0);
-
-    if (state)
-    {
-        Serial.println("Ready");
-    }
-    else
-    {
-        lv_label_set_text(loading_label, AP_NAME);
-    }
 }
 
 void loop()
 {
     lv_task_handler();
-    wm.process();
+    //wm.process();
 }
