@@ -1,84 +1,62 @@
 #include <ESP8266WiFi.h>
-#include <WiFiClient.h>
 #include <ESP8266HTTPClient.h>
-#include <JPEGDecoder.h>
-#include <TFT_eSPI.h>       // Include the graphics library (this includes the sprite functions)
+#include <TFT_eSPI.h>       // Hardware-specific library
 
-TFT_eSPI tft = TFT_eSPI();  // Invoke library, pins defined in User_Setup.h
+TFT_eSPI tft = TFT_eSPI();  // Invoke custom library
 
 const char* ssid = "PanSiAiDong";
 const char* password = "808808808";
-
-// 图像URL
-const char* imageURL = "http://192.168.1.15:8080/newshot.jpg";
+const char* imageURL = "http://192.168.1.15:8080/shot1.bmp";
 
 void setup() {
   Serial.begin(115200);
-  WiFi.begin(ssid, password);             // Connect to the network
-  Serial.print("Connecting to ");
-  Serial.print(ssid); Serial.println(" ...");
-
-  int i = 0;
-  while (WiFi.status() != WL_CONNECTED) { // Wait for the Wi-Fi to connect
-    delay(1000);
-    Serial.print(++i); Serial.print(' ');
-  }
-
-  Serial.println('\n');
-  Serial.println("Connection established!");  
-  Serial.print("IP address:\t");
-  Serial.println(WiFi.localIP());         // Send the IP address of the ESP8266 to the computer
-
+  WiFi.begin(ssid, password);
   tft.init();
-  tft.setRotation(1); // 根据实际情况调整屏幕方向
+  tft.setRotation(1); // Adjust according to your display
+  
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(1000);
+    Serial.println("Connecting to WiFi...");
+  }
+  Serial.println("Connected to WiFi");
 }
 
 void loop() {
-  if ((WiFi.status() == WL_CONNECTED)) { //Check WiFi connection status
+  HTTPClient http;
+  http.begin(imageURL);
+  int httpCode = http.GET();
 
-    HTTPClient http;  //Declare an object of class HTTPClient
+  if (httpCode == 200) {
+    // Get the TCP stream
+    WiFiClient * stream = http.getStreamPtr();
 
-    http.begin(imageURL);  //Specify request destination
-    int httpCode = http.GET();                                                                  //Send the request
+    // Read BMP header
+    uint8_t bmpHeader[54];
+    stream->readBytes(bmpHeader, 54);
 
-    if (httpCode > 0) { //Check the returning code
+    // Assuming the BMP is 24-bit, parse width and height from the header
+    uint32_t bmpWidth = bmpHeader[18] + (bmpHeader[19] << 8) + (bmpHeader[20] << 16) + (bmpHeader[21] << 24);
+    uint32_t bmpHeight = bmpHeader[22] + (bmpHeader[23] << 8) + (bmpHeader[24] << 16) + (bmpHeader[25] << 24);
 
-      // Get the request response payload
-      WiFiClient * stream = http.getStreamPtr();
+    // Now read the bitmap pixels
+    // Assuming the image is 500x500, and each pixel is 3 bytes (24-bit BMP)
+    for (int y = bmpHeight - 1; y >= 0; y--) { // BMP rows are stored in reverse order
+      for (int x = 0; x < bmpWidth; x++) {
+        uint8_t b = stream->read(); // Blue
+        uint8_t g = stream->read(); // Green
+        uint8_t r = stream->read(); // Red
 
-      // Decode JPEG
-      JpegDec.decodeHttpStream(stream);
+        // Convert RGB to 16-bit color (5-6-5)
+        uint16_t color = tft.color565(r, g, b);
 
-      // Render the JPEG on the TFT
-      drawJPEG();
-
+        // Draw the pixel
+        tft.drawPixel(x, y, color);
+      }
     }
-
-    http.end();   //Close connection
+  } else {
+    Serial.println("Failed to retrieve the image");
   }
 
-  delay(10000); // Fetch every 10 seconds
-}
-
-void drawJPEG() {
-  // Retrieve decoded image dimensions
-  uint16_t jpgWidth = JpegDec.width;
-  uint16_t jpgHeight = JpegDec.height;
-
-  // Calculate scaling factors and positions
-  uint16_t xPos = 0;
-  uint16_t yPos = 0;
-
-  // Scale the image to fit the screen width/height while maintaining aspect ratio
-  float factor = min((float)tft.width() / jpgWidth, (float)tft.height() / jpgHeight);
-  uint16_t scaledWidth = jpgWidth * factor;
-  uint16_t scaledHeight = jpgHeight * factor;
-  xPos = (tft.width() - scaledWidth) / 2;
-  yPos = (tft.height() - scaledHeight) / 2;
-
-  // Render the image on screen
-  while (JpegDec.read()) {
-    // Draw the pixels
-    tft.drawPixel(JpegDec.x * factor + xPos, JpegDec.y * factor + yPos, JpegDec.pixels[0]);
-  }
+  http.end(); // Free resources
+  delay(60000); // Update every 60 seconds
 }
