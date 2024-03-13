@@ -7,8 +7,9 @@
 
 using namespace std;
 
-const char* ssid = "Redmi_C989";
-const char* password = "13945655410"; 
+const char* ssid = "PanSiAiDong";
+const char* password = "808808808"; 
+const char* picUrl = "http://192.168.1.15:8080/newshot.jpg"
 const int DEBUG = 0;
 
 LV_FONT_DECLARE(tencent_w7_22)
